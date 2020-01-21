@@ -1,0 +1,6 @@
+<ID>,A,ikari,kiriri
+<Example>,数式や定理なども、役に立たないものの方が美しいと感じられるよ。
+<Detail>,役に立つとか、立たないとかいうような評価軸を忘れさせるものが、美しく感じられるのだと思う。
+<Refute>,aaaaaaaaaaaaaaaaa
+<Rerefu>,aaaaaaaaaaaaaaaaaaaaaaaaa
+<Perspec>,aaaaaaaaaaaaaaaaaaa

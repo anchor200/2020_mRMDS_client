@@ -63,6 +63,7 @@ class DialogManager:
         print(self.Names, self.Opinions)
 
         self.MainClaims = []
+        tempMain = []
         path_mc = '../tempdata/main_claims.txt'
         with open(path_mc, encoding="utf-8") as f:
             l_strip = [s.strip() for s in f.readlines()][0]
@@ -74,8 +75,20 @@ class DialogManager:
             od = OrderedDict()
             for i in range(len(keys)):
                 od[keys[i]] = dev_by_keys[i]
-            self.MainClaims.append(od)
+            tempMain.append(od)
+        print(tempMain)
+
+        path_ct = '../tempdata/chosen_topics.txt'
+        with open(path_ct, encoding="utf-8") as f:
+            l_strip = [s.strip() for s in f.readlines()][0]
+        self.ChosenTopics = l_strip.split(",")
+        for ct in self.ChosenTopics:
+            for dic in tempMain:
+                if dic["ID"] == ct:
+                    self.MainClaims.append(dic)
+
         print(self.MainClaims)
+
 
         self.dialogue_transcript = []  # 発話の台本
         partcipants = [chr(i) for i in range(65, 65 + self.PARTICIPANTS)]
@@ -179,7 +192,7 @@ class DialogManager:
 
     def wait_duration_calculation(self, utterance):
         temp = len(self.converter.do(utterance))
-        return temp / 6 + 1  # unity側の、押してから選択肢が消えるまでの時間との兼ね合いがある。
+        return temp / 4 + 1  # unity側の、押してから選択肢が消えるまでの時間との兼ね合いがある。
 
     def command_generation(self, mes, operation):
         # print(mes)
@@ -193,16 +206,12 @@ class DialogManager:
                     command = ""
                     if temp[0] == "A":
                         who = 0
-                        gaze = self.gaze_on_listening[0]
                     elif temp[0] == "B":
                         who = 1
-                        gaze = self.gaze_on_listening[1]
                     elif temp[0] == "C":
                         who = 2
-                        gaze = self.gaze_on_listening[2]
                     elif temp[0] == "D":
                         who = 3
-                        gaze = self.gaze_on_listening[3]
 
                     if who >= 0:
                         print("look!")
@@ -234,12 +243,15 @@ class DialogManager:
                     hajime = 0
                     sentences = [re.sub(r' |/|\n', "、", s) for s in sentences if not s == ""]
                     for sentence in sentences:
+                        sentence = sentence.replace("「真理」", "しんり")
+                        sentence = sentence.replace("「老い」", "おい")
+                        sentence = sentence.replace("「悪」", "あく")
                         command = ""
                         command += str(who) + ";" + "/say " + sentence + "[EOF]"
                         waittime = self.wait_duration_calculation(sentence)
 
                         if re.search(r'<LookNingenAll>|<LookAllKaijo>', operation):
-                            # self.look_ningen(operation, who)
+                            self.look_ningen(operation, who)
                             command += ";" + str(waittime)
                             command += "\n"
                             with open(self.path_command, mode='a', encoding="utf-8") as f:

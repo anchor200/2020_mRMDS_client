@@ -14,6 +14,15 @@ class DialogManager:
         self.TOPIC_ID = TOPIC_ID
         self.DEFAULT_PACE = 6
 
+        topics = ["S", "P", "D", "F", "G", "H", "I", "J"]
+        self.chosen_topics = random.sample(topics, 4)
+        self.path_chosen_topics = '../tempdata/chosen_topics.txt'
+        topicsend = ""
+        for tp in self.chosen_topics:
+            topicsend += tp + ","
+        with open(self.path_chosen_topics, mode='w', encoding="utf-8") as f:
+            f.write(topicsend[:-1])
+
         self.variables_prepare()
         self.socket_and_thread_start(host, port)
 
@@ -141,8 +150,17 @@ class DialogManager:
 
             self.opn_pathes.append([opn_path, ID, NAME])
 
+
+            topicsend = ""
+            for tp in self.chosen_topics:
+                topicsend += tp + ","
+            clientsocket.sendto(topicsend.encode('utf-8'), (client_address, client_port))
+            print(topicsend)
+
+
             clientsocket.sendto(("you are <ID> :" + ID + "," + NAME).encode('utf-8'), (client_address, client_port))
             print('New client: {0}:{1}'.format(client_address, client_port))
+
             # クライアントは0からカウント　ユーザ0、ユーザ1、ユーザ2
             while True:
                 try:
