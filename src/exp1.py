@@ -33,6 +33,19 @@ class DialogManager:
         with open(self.path_command, mode='w', encoding="utf-8") as f:
             f.write(s)
         # 送るのが待たれているコマンドを記録するファイル
+        command = str(self.PARTICIPANTS - 1) + ";" + "/aitalk-pitch 0.7" + "\n"
+        with open(self.path_command, mode='a') as f:
+            f.write(command)
+        for j in range(self.PARTICIPANTS):
+            command = str(j) + ";" + "/gesture init" + "\n"
+            with open(self.path_command, mode='a') as f:
+                f.write(command)
+            command = str(j) + ";" + "/look M 0 300 300" + "\n"
+            with open(self.path_command, mode='a') as f:
+                f.write(command)
+            command = str(j) + ";" + "/aitalk-speed 1.1" + "\n"
+            with open(self.path_command, mode='a') as f:
+                f.write(command)
 
     def socket_and_thread_start(self, host, port):
         self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

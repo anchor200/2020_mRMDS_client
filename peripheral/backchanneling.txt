@@ -1,4 +1,4 @@
-﻿たしかに,<Positive>
+たしかに,<Positive>
 なるほど,<Positive>
 うんうん,<Positive>
 面白いね,<Positive>

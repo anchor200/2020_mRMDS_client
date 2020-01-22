@@ -1,0 +1,4 @@
+<ID>,A,sss,ssss
+<Example>,老化が進むと、頑固になって意地悪になる人もいるよね。
+<Detail>,老いると過去にすがるようになるから、新しい価値観を受け入れにくくなってしまうよ。
+<Refute>,aaaaaaaaaaaaaaaaaa

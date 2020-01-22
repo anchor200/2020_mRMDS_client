@@ -1,4 +1,4 @@
 発話ID,発話者,次の発話の候補,次の発話の決め方,特殊な操作,表示,発話,態度
 0000,A,,<Begin>,,,,
 0001,A,,<Terminate>,,,,
-0002,X,0002,<Holding>,<LookNingen>,@話す#（話すときにはできるだけこのボタンを押してね！）,<YourNameX>さん,
+0002,X,0002,<Holding>,<LookNingen>,&「<Argument>という主張は正しいか」について結論を出してください。,<YourNameX>さん,

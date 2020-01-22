@@ -32,7 +32,7 @@ class DialogManager:
         self.socket_and_thread_start(host, port)
 
     def constatns_prepare(self):
-        self.ningenDiscussionDuration = 300
+        self.ningenDiscussionDuration = 5
         path_bc = '../peripheral/backchanneling.txt'
         with open(path_bc, encoding="utf-8") as f:
             self.Aiduchi = [s.strip() for s in f.readlines()]
@@ -56,7 +56,11 @@ class DialogManager:
             try:
                 for li in l_strip[1:]:
                     n = li.split(",")
-                    od[n[0]] = n[1]
+                    if n[0] == "<Perspec>":
+                        od[n[0]] = n[1].replace("。", "、")
+                    else:
+                        od[n[0]] = n[1]
+
                 self.Opinions.append([l_strip[0].split(",")[1], od])
             except IndexError:
                 continue
@@ -99,11 +103,12 @@ class DialogManager:
 
     def variables_prepare(self):
         self.next_speech_holder = "0000"
+        self.InDiscussion = False
         self.kakasi = kakasi()
         self.kakasi.setMode("J", "H")
         self.converter = self.kakasi.getConverter()
 
-        self.toBegin = 999  # 全員が始めるボタンを押すまで待つ
+        self.toBegin = 0  # 全員が始めるボタンを押すまで待つ
         self.p_on_focus = 0  # 誰がメインの話者か(0=A)
 
         self.opn_relation = []  # それぞれの意見に対するそれぞれの反応
@@ -135,11 +140,13 @@ class DialogManager:
     def gestures_and_utterance_preset(self):
         self.gesture_furikaeri = "furikaeri"
         self.gesture_furikaeri_kaijo = "furikaeri_kaijo"
+        self.gestures_close_eye = "close_eye"
+        self.gestures_open_eye = "open_eye"
         self.gesture_front = "/look M 0 300 300"
         self.gestures_on_short_utterance = ["short_utterance_R", "short_utterance_L"]
         self.gestures_on_long_utterance = ["long_utterance", "long_utterance_3", "long_utterance_4"]
         self.gestures_on_agreement = ["nod1", "nod2", "nod3"]
-        self.gestures_on_opposition = ["kubihuri", "kubikashigeL", "kubikashigeR"]
+        self.gestures_on_opposition = ["kubihuri", "kubikasigeL", "kubikasigeR"]
         # self.gestures_on_raise_hand = ["raisehand_L_first", "raisehand_R_fisrt"]
         self.gestures_on_raise_hand = ["short_utterance_R", "short_utterance_L"]
         self.utterance_on_raise_hand = ["僕からいいかな", "えっと", "はい", "話していい？", "話したいです", "うーんと", "なんというか、その", "いろいろあるけど、えっと"]
@@ -147,10 +154,15 @@ class DialogManager:
                                   ["/look M 200 300 300", "/look M 0 300 300", "/look M -200 300 300", "/look M 0 300 300"],
                                   ["/look M 0 300 300", "/look M 200 300 300", "/look M 0 300 300", "/look M -200 300 300"],
                                   ["/look M -200 300 300", "/look M 0 300 300", "/look M 200 300 300", "/look M 0 300 300"]]
-        self.up_gaze_on_listening = [["/look M 0 400 300", "/look M -200 400 300", "/look M 0 400 300", "/look M 200 400 300"],
-                                  ["/look M 200 400 300", "/look M 0 400 300", "/look M -200 400 300", "/look M 0 400 300"],
-                                  ["/look M 0 400 300", "/look M 200 400 300", "/look M 0 400 300", "/look M -200 400 300"],
-                                  ["/look M -200 400 300", "/look M 0 400 300", "/look M 200 400 300", "/look M 0 400 300"]]
+        self.up_gaze_on_listening = [["/look M 0 400 300", "/look M -400 400 300 /gesture yokomuki", "/look M -100 400 300", "/look M 200 400 300"],
+                                  ["/look M 200 400 300", "/look M 0 400 300", "/look M -400 400 300 /gesture yokomuki", "/look M -100 400 300"],
+                                  ["/look M -100 400 300", "/look M 200 400 300", "/look M 0 400 300", "/look M -400 400 300 /gesture yokomuki"],
+                                  ["/look M -400 400 300 /gesture yokomuki", "/look M -100 400 300", "/look M 200 400 300", "/look M 0 400 300"]]
+        self.up_gaze_on_listening_modoshi = [["/look M 0 400 300", "/look M -400 400 300 /gesture yokomuki_kaijo", "/look M -0 400 300", "/look M 200 400 300"],
+                                  ["/look M 200 300 300", "/look M 0 300 300", "/look M -400 300 300 /gesture yokomuki_kaijo", "/look M 0 300 300"],
+                                  ["/look M 0 300 300", "/look M 200 300 300", "/look M 0 400 300", "/look M -400 300 300 /gesture yokomuki_kaijo"],
+                                  ["/look M -400 300 300 /gesture yokomuki_kaijo", "/look M 0 300 300", "/look M 200 300 300", "/look M 0 300 300"]]
+
     def socket_and_thread_start(self, host, port):
         self.serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
@@ -167,12 +179,39 @@ class DialogManager:
 
         # command_to_sendの命令がすべて実行されたかどうかを記録する
         # 一定行以上あるなら選択できないようにする
-        # self.thread_for_speech_end_check = threading.Thread(target=self.operation_waiting_check)
-        # self.thread_for_speech_end_check.start()
+        self.thread_for_discussion_end_check = threading.Thread(target=self.operation_waiting_check)
+        self.thread_for_discussion_end_check.start()
 
         while True:
             # メインスレッドは遊ばせておく (ハンドラを処理させても構わない)
             time.sleep(1)
+
+    def operation_waiting_check(self):
+        # ここのループを回してる関係でつなぎなおしができなくなってる
+        while True:
+            time.sleep(0.1)
+
+            if time.perf_counter() - self.timer > self.ningenDiscussionDuration and self.InDiscussion:
+                print("discussion end")
+                command = ""
+                for i in range(self.PARTICIPANTS):
+                    command += str(i) + ";/gesture " + self.gestures_open_eye + ";0\n"
+                with open(self.path_command, mode='a', encoding="utf-8") as f:
+                    f.write(command)
+
+                for c in self.clients:
+                    c[0].sendto("<Clear>:".encode('utf-8'), c[1])
+
+                new_list = self.next_speech_holder
+                self.InDiscussion = False
+
+                line_to_send, next_speaker = self.generate_choice_sender(new_list)
+                print("send to end discussion" + line_to_send)
+
+                t = threading.Timer(0, self.send_choice, args=[line_to_send, next_speaker])
+                t.start()
+
+
 
     def sender_detection(self, client_address, client_port):
         j = 0
@@ -233,8 +272,8 @@ class DialogManager:
                         if operation == "<LookKaijo>":  # 人間を見上げる
                             for i in range(self.PARTICIPANTS):
                                 if not i == who:
-                                    print("look control")
-                                    gaze = self.gaze_on_listening[who][i]
+                                    print("look control modoshi")
+                                    gaze = self.up_gaze_on_listening_modoshi[who][i]
                                     command = str(i) + ";" + gaze + ";" + "0\n"
                                     with open(self.path_command, mode='a', encoding="utf-8") as f:
                                         f.write(command)
@@ -248,14 +287,16 @@ class DialogManager:
                         sentence = sentence.replace("「悪」", "あく")
                         command = ""
                         command += str(who) + ";" + "/say " + sentence + "[EOF]"
-                        waittime = self.wait_duration_calculation(sentence)
+                        waittimeTemp = self.wait_duration_calculation(sentence)
 
-                        if re.search(r'<LookNingenAll>|<LookAllKaijo>', operation):
+                        if re.search(r'<LookNingenALL>|<LookALLKaijo>', operation):
+                            print("look all")
                             self.look_ningen(operation, who)
-                            command += ";" + str(waittime)
+                            command += ";" + str(waittimeTemp)
                             command += "\n"
                             with open(self.path_command, mode='a', encoding="utf-8") as f:
                                 f.write(command)
+
                         else:  # 振り向き等がない場合
                             if hajime == 0:
                                 gesture = ""
@@ -275,12 +316,15 @@ class DialogManager:
                                 command += " /gesture " + gesture
 
                             if not hajime == len(sentences) - 1:
-                                waittime = 0
-                            command += ";" + str(waittime)
-                            command += "\n"
+                                command += ";" + str(0) + "\n"
+                            else:
+                                command += ";" + str(waittimeTemp) + "\n"
+
                             with open(self.path_command, mode='a', encoding="utf-8") as f:
                                 f.write(command)
                         hajime += 1
+                        waittime += waittimeTemp
+
         return waittime
 
     def id_search(self, id):  # 現在の台本、あいづち、個tントローラー全部見る
@@ -297,6 +341,23 @@ class DialogManager:
         for id in next_list:
             line_list.append(self.id_search(id))
 
+        who_next = -1
+        if len(line_list) > 0:
+            try:
+                print ("おいおいおい")
+                print(line_list)
+                who_next = line_list[0]["発話者"]
+                if who_next == "A":
+                    who_next = 0
+                elif who_next == "B":
+                    who_next = 1
+                elif who_next == "C":
+                    who_next = 2
+                elif who_next == "D":
+                    who_next = 3
+            except TypeError:
+                print("次がわからない状態")
+
         if designator == "":
             return line_list
         elif designator == "<Holding>":
@@ -304,27 +365,36 @@ class DialogManager:
         elif designator == "<NingenDiscuss>":
             return line_list
         elif designator == "<PrefDiv>":  # 賛否が関係ある時は、0賛成1中立2反対  遠い意見は削除する
-            if self.opn_relation[self.p_on_focus][who_num] == "<Agree>":
-                del line_list[2]
-            elif self.opn_relation[self.p_on_focus][who_num] == "<DisAgree>":
-                del line_list[0]
+            try:
+                if self.opn_relation[self.p_on_focus][who_next] == "<Agree>":
+                    print("agree mood")
+                    return [line_list[0]]
+                elif self.opn_relation[self.p_on_focus][who_next] == "<DisAgree>":
+                    print("disagree mood")
+                    return [line_list[1]]
+            except IndexError:
+                print(who_num)
+                pass
+
             return line_list
 
         return []
 
     def preference_register(self, operation, who_num):
-        if re.search(r'<Agree>|<Neutral>|<DisAgree>' ,operation):
+        print(operation, re.search(r'<Agree>|<Neutral>|<DisAgree>' ,operation), self.p_on_focus, who_num)
+        if bool(re.search(r'<Agree>|<Neutral>|<DisAgree>', operation)):
+            print("register pref", operation)
             self.opn_relation[self.p_on_focus][who_num] = operation
 
     def look_ningen(self, operation, who_num):
         command = ""
         diddid = False
-        if operation == "<LookNingenAll>":
+        if operation == "<LookNingenALL>":
             print(operation)
             for i in range(self.PARTICIPANTS):
                 command += str(i) + ";/gesture " + self.gesture_furikaeri + ";0\n"
             diddid = True
-        elif operation == "<LookAllKaijo>":
+        elif operation == "<LookALLKaijo>":
             print(operation)
             for i in range(self.PARTICIPANTS):
                 command += str(i) + ";/gesture " + self.gesture_furikaeri_kaijo + ";0\n"
@@ -341,6 +411,8 @@ class DialogManager:
         aiduchiIn = OrderedDict()
         i = 0
         mark = -1
+        print("speech!")
+        print(speech)
         for detail in speech:
             if "<Aiduchi>" in detail["表示"]:
                 mark = i
@@ -369,6 +441,7 @@ class DialogManager:
       if "<Command>" in mes:
             who = mes.split(":")[-1].split(",")[0]
             who_num = 0
+            waiting_time = 0
             if who == "A":
                 who_num = 0
             elif who == "B":
@@ -382,8 +455,11 @@ class DialogManager:
             new_list = temp_line["次の発話の候補"].split(";")
             designator = temp_line["次の発話の決め方"]
             operation = temp_line["特殊な操作"]
+            print("----------------------------", new_list, designator, operation)
             self.preference_register(operation, who_num)  # この後には何らかの発話をさせるかもここで戻らせる
             new_list = self.designate_next_line(new_list, designator, who_num)
+            print("ここで消えるもんが消えてなきゃおかしい！")
+            print(new_list)
 
             if designator == "<Begin>":  # スタートが来た場合は先頭に送る   ここ大事！！！！
                 self.toBegin += 1
@@ -396,7 +472,7 @@ class DialogManager:
                 self.p_on_focus += 1
                 new_list = [self.id_search(self.dialogue_transcript[self.p_on_focus][0]["発話ID"])]
             elif designator == "<Terminate>":
-                time.sleep(5)
+                time.sleep(10)
                 end_mes = "<Choice>:0001," + self.ID + ",@おわり,みんな、ありがとう,"
                 for c in self.clients:
                     c[0].sendto(end_mes.encode('utf-8'), c[1])
@@ -407,22 +483,35 @@ class DialogManager:
                 print(new_list)
                 waiting_time = self.command_generation(mes, operation)
                 # 本当はテキストからとってくるべき。
-                self.timer = time.perf_counter()
+                self.timer = time.perf_counter()    # 時間を設定した！
+                self.InDiscussion = True
+
+                # ここで目を閉じさせる
+                command = ""
+                for i in range(self.PARTICIPANTS):
+                    command += str(i) + ";/gesture " + self.gestures_close_eye + ";0\n"
+                with open(self.path_command, mode='a', encoding="utf-8") as f:
+                    f.write(command)
+
+                time.sleep(waiting_time)
                 for c in self.clients:
-                    holding = ("<Choice>:0002," + self.ID + ",@話す,<YourNameX>さん,").replace("X", c[2])
+                    holding = ("<Choice>:0002," + self.ID + ",&「<Argument>という主張は正しいか」について結論を出してください。,<YourNameX>さん,").replace("X", c[2])
                     c[0].sendto(self.fix_transcript(holding).encode('utf-8'), c[1])
 
                 return
 
-            elif designator == "<Holding>":
+            elif designator == "<Holding>":  # discussion中にボタンを押させないなら、このへんは意味ない
                 print(time.perf_counter() - self.timer)
                 if time.perf_counter() - self.timer > self.ningenDiscussionDuration:  # 人が話す時間
                     new_list = self.next_speech_holder
+                    self.InDiscussion = False
                 else:
-                    # time.sleep(10)
+                    waiting_time = 5
+                    self.command_generation(mes, operation)
                     pass
 
-            waiting_time = self.command_generation(mes, operation)
+            else:
+                waiting_time = self.command_generation(mes, operation)
 
             """if who_speak >= 0:
                 for i in range(self.PARTICIPANTS):
@@ -465,7 +554,7 @@ class DialogManager:
 
     def send_choice(self, line_to_send, next_speaker):
         line_to_send = self.fix_transcript(line_to_send)
-        wildcard = True
+        wildcard = False
         if next_speaker == "X":
             wildcard = True
         for c in self.clients:
