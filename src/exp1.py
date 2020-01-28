@@ -6,6 +6,7 @@ from data_import import read_utterance
 import threading
 import random
 import datetime
+import re
 from collections import deque
 
 class DialogManager:
@@ -27,6 +28,11 @@ class DialogManager:
         self.socket_and_thread_start(host, port)
 
     def variables_prepare(self):
+        todaydetail = datetime.datetime.today()
+        self.time_count_path = "../tempdata/time_count_exp1"  + "_" + str(todaydetail.strftime("%Y%m%d_%H%M%S")) + ".txt"
+        s = ""
+        with open(self.time_count_path, mode='w', encoding="utf-8") as f:
+            f.write(s)
         self.opn_pathes = []
         self.path_command = '../tempdata/commands_to_be_sent.txt'
         s = ""
@@ -106,9 +112,14 @@ class DialogManager:
             for temp2 in temp1:
                 temp = temp2.split(",")
                 if len(temp) >= 3:
-                    sentences = temp[2][:-1].split("。")
+                    # sentences = temp[2][:-1].split("。")
+                    sentences = re.split('[。？]', temp[2])
+                    # sentences = temp[2].split("。")  # 長すぎるといけないので文章を分ける
+                    sentences = [re.sub(r' |/|\n', "。", s) for s in sentences if not s == ""]
+                    print("split")
+                    print(sentences)
                     for sentence in sentences:
-                        if not sentence == "":
+                        if not sentence == "" and not sentence == "。":
                             command = ""
                             if temp[0] == "A":
                                 prefix = "0;"
@@ -122,7 +133,7 @@ class DialogManager:
                                 print("sent" + sentence)
                                 continue
                             # command += prefix + "/say " + temp[2][:-1] + "[EOF];10\n"
-                            command += prefix + "/say " + sentence + "。[EOF];0\n"
+                            command += prefix + "/say " + sentence + "[EOF];0\n"
                             print("command : " + command)
 
                             with open(self.path_command, mode='a', encoding="utf-8") as f:
@@ -163,6 +174,9 @@ class DialogManager:
 
             self.opn_pathes.append([opn_path, ID, NAME])
 
+            s = "<ID>," + ID + "," + NAME + "," + ROBO + "," + str(time.perf_counter())
+            with open(self.time_count_path, mode='w', encoding="utf-8") as f:
+                f.write(s)
 
             topicsend = ""
             for tp in self.chosen_topics:

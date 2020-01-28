@@ -1,0 +1,2 @@
+<ID>,D,Ise,orange
+<Example>,桜の花は、散る間際がいちばんきれいだよね。

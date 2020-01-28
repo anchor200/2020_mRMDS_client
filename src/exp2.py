@@ -32,7 +32,7 @@ class DialogManager:
         self.socket_and_thread_start(host, port)
 
     def constatns_prepare(self):
-        self.ningenDiscussionDuration = 5
+        self.ningenDiscussionDuration = 360
         path_bc = '../peripheral/backchanneling.txt'
         with open(path_bc, encoding="utf-8") as f:
             self.Aiduchi = [s.strip() for s in f.readlines()]
@@ -96,6 +96,8 @@ class DialogManager:
 
         self.dialogue_transcript = []  # 発話の台本
         partcipants = [chr(i) for i in range(65, 65 + self.PARTICIPANTS)]
+        srcA = read_utterance("../transcripts/PRESET/Intro.csv")
+        self.dialogue_transcript.append(srcA)
         for p in partcipants:
             srcA = read_utterance("../transcripts/PRESET/Branch" + p + ".csv")
             self.dialogue_transcript.append(srcA)
@@ -109,10 +111,10 @@ class DialogManager:
         self.converter = self.kakasi.getConverter()
 
         self.toBegin = 0  # 全員が始めるボタンを押すまで待つ
-        self.p_on_focus = 0  # 誰がメインの話者か(0=A)
+        self.p_on_focus = -1  # 誰がメインの話者か(1=A)
 
         self.opn_relation = []  # それぞれの意見に対するそれぞれの反応
-        for i in range(self.PARTICIPANTS):
+        for i in range(self.PARTICIPANTS + 1):
             tempopn = []
             for j in range(self.PARTICIPANTS):
                 tempopn.append("<Neutral>")  # <Neutral> <Agree> <DisAgree>の三つある
@@ -136,6 +138,12 @@ class DialogManager:
             command = str(j) + ";" + "/aitalk-speed 1.1" + "\n"
             with open(self.path_command, mode='a') as f:
                 f.write(command)
+
+        todaydetail = datetime.datetime.today()
+        self.time_count_path = "../tempdata/time_count_exp2"  + "_" + str(todaydetail.strftime("%Y%m%d_%H%M%S")) + ".txt"
+        s = ""
+        with open(self.time_count_path, mode='w', encoding="utf-8") as f:
+            f.write(s)
 
     def gestures_and_utterance_preset(self):
         self.gesture_furikaeri = "furikaeri"
@@ -198,9 +206,19 @@ class DialogManager:
                     command += str(i) + ";/gesture " + self.gestures_open_eye + ";0\n"
                 with open(self.path_command, mode='a', encoding="utf-8") as f:
                     f.write(command)
+                print("eye opened")
+                time.sleep(0.1)
 
-                for c in self.clients:
-                    c[0].sendto("<Clear>:".encode('utf-8'), c[1])
+                while True:
+                    try:
+                        for c in self.clients:
+                            c[0].sendto("<Clear>:".encode('utf-8'), c[1])
+                        break
+                    except ConnectionResetError:
+                        sleep(3)
+                        print("connection reset trial")
+                        continue
+
 
                 new_list = self.next_speech_holder
                 self.InDiscussion = False
@@ -210,6 +228,33 @@ class DialogManager:
 
                 t = threading.Timer(0, self.send_choice, args=[line_to_send, next_speaker])
                 t.start()
+
+            if -0.3 + self.ningenDiscussionDuration / 3 < int(time.perf_counter() - self.timer) <= 0.3 + self.ningenDiscussionDuration / 3 and self.InDiscussion:
+                print("discussion mid 1")
+                try:
+                    for c in self.clients:
+                        c[0].sendto("<Middle>:".encode('utf-8'), c[1])
+                except BrokenPipeError:
+                    print("broken pipe")
+                    pass
+
+            if -0.3 + self.ningenDiscussionDuration / 2 < int(time.perf_counter() - self.timer) <= 0.3 + self.ningenDiscussionDuration / 2 and self.InDiscussion:
+                print("discussion mid 2")
+                try:
+                    for c in self.clients:
+                        c[0].sendto("<Middle>:".encode('utf-8'), c[1])
+                except BrokenPipeError:
+                    print("broken pipe")
+                    pass
+
+            if -0.3 + self.ningenDiscussionDuration * 0.7 < int(time.perf_counter() - self.timer) <= 0.3 + self.ningenDiscussionDuration * 0.7 and self.InDiscussion:
+                print("discussion mid 3")
+                try:
+                    for c in self.clients:
+                        c[0].sendto("<Middle>:".encode('utf-8'), c[1])
+                except BrokenPipeError:
+                    print("broken pipe")
+                    pass
 
 
 
@@ -231,7 +276,8 @@ class DialogManager:
 
     def wait_duration_calculation(self, utterance):
         temp = len(self.converter.do(utterance))
-        return temp / 4 + 1  # unity側の、押してから選択肢が消えるまでの時間との兼ね合いがある。
+        return max(temp / 5, 2.5)
+        return temp / 5 + 1  # unity側の、押してから選択肢が消えるまでの時間との兼ね合いがある。
 
     def command_generation(self, mes, operation):
         # print(mes)
@@ -261,6 +307,7 @@ class DialogManager:
                                 command = str(i) + ";" + gaze + ";" + "0\n"
                                 with open(self.path_command, mode='a', encoding="utf-8") as f:
                                     f.write(command)
+                                time.sleep(0.1)
                         if operation == "<LookNingen>":  # 人間を見上げる
                             for i in range(self.PARTICIPANTS):
                                 if not i == who:
@@ -269,6 +316,7 @@ class DialogManager:
                                     command = str(i) + ";" + gaze + ";" + "0\n"
                                     with open(self.path_command, mode='a', encoding="utf-8") as f:
                                         f.write(command)
+                                    time.sleep(0.1)
                         if operation == "<LookKaijo>":  # 人間を見上げる
                             for i in range(self.PARTICIPANTS):
                                 if not i == who:
@@ -277,25 +325,32 @@ class DialogManager:
                                     command = str(i) + ";" + gaze + ";" + "0\n"
                                     with open(self.path_command, mode='a', encoding="utf-8") as f:
                                         f.write(command)
+                                    time.sleep(0.1)
 
-                    sentences = temp[2].split("。")  # 長すぎるといけないので文章を分ける
+                    sentences = re.split('[。？]', temp[2])
+
+                    # sentences = temp[2].split("。")  # 長すぎるといけないので文章を分ける
                     hajime = 0
                     sentences = [re.sub(r' |/|\n', "、", s) for s in sentences if not s == ""]
+                    print("split")
+                    print(sentences)
                     for sentence in sentences:
-                        sentence = sentence.replace("「真理」", "しんり")
+                        sentence = sentence.replace("負の側面", "ふの側面")
                         sentence = sentence.replace("「老い」", "おい")
                         sentence = sentence.replace("「悪」", "あく")
                         command = ""
                         command += str(who) + ";" + "/say " + sentence + "[EOF]"
                         waittimeTemp = self.wait_duration_calculation(sentence)
 
-                        if re.search(r'<LookNingenALL>|<LookALLKaijo>', operation):
+                        if bool(re.search(r'<LookNingenALL>|<LookALLKaijo>', operation)) and hajime == 0:
                             print("look all")
                             self.look_ningen(operation, who)
                             command += ";" + str(waittimeTemp)
                             command += "\n"
                             with open(self.path_command, mode='a', encoding="utf-8") as f:
                                 f.write(command)
+                            print("wrote a command as a leader of lookningenall: " + command)
+                            time.sleep(0.1)
 
                         else:  # 振り向き等がない場合
                             if hajime == 0:
@@ -322,6 +377,8 @@ class DialogManager:
 
                             with open(self.path_command, mode='a', encoding="utf-8") as f:
                                 f.write(command)
+                            print("wrote a command: " + command)
+                            time.sleep(0.1)
                         hajime += 1
                         waittime += waittimeTemp
 
@@ -465,17 +522,32 @@ class DialogManager:
                 self.toBegin += 1
                 if self.toBegin < self.PARTICIPANTS:
                     return
-                self.p_on_focus = 0
-                new_list = [self.id_search(self.dialogue_transcript[self.p_on_focus][0]["発話ID"])]
+                if self.p_on_focus == -1:
+                    self.p_on_focus = 0
+                    new_list = [self.id_search(self.dialogue_transcript[self.p_on_focus][0]["発話ID"])]
+
+                s = "start: " + str(time.perf_counter())
+                with open(self.time_count_path, mode='a', encoding="utf-8") as f:
+                    f.write(s)
 
             if designator == "<Transition>":
                 self.p_on_focus += 1
                 new_list = [self.id_search(self.dialogue_transcript[self.p_on_focus][0]["発話ID"])]
+
+                s = "start: " + str(time.perf_counter()) + ":(" + str(self.p_on_focus) + ")"
+                with open(self.time_count_path, mode='a', encoding="utf-8") as f:
+                    f.write(s)
+
             elif designator == "<Terminate>":
                 time.sleep(10)
                 end_mes = "<Choice>:0001," + self.ID + ",@おわり,みんな、ありがとう,"
                 for c in self.clients:
                     c[0].sendto(end_mes.encode('utf-8'), c[1])
+
+                s = "end: " + str(time.perf_counter())
+                with open(self.time_count_path, mode='a', encoding="utf-8") as f:
+                    f.write(s)
+
                 return
             elif designator == "<NingenDiscuss>":
                 self.next_speech_holder = new_list
@@ -495,7 +567,7 @@ class DialogManager:
 
                 time.sleep(waiting_time)
                 for c in self.clients:
-                    holding = ("<Choice>:0002," + self.ID + ",&「<Argument>という主張は正しいか」について結論を出してください。,<YourNameX>さん,").replace("X", c[2])
+                    holding = ("<Choice>:0002," + self.ID + ",&「<Argument>」という意見についてどう思いますか？#なるべく全員で結論を出してください。,<YourNameX>さん,").replace("X", c[2])
                     c[0].sendto(self.fix_transcript(holding).encode('utf-8'), c[1])
 
                 return
@@ -511,7 +583,9 @@ class DialogManager:
                     pass
 
             else:
+                print("いたって平凡な発話をします")
                 waiting_time = self.command_generation(mes, operation)
+                print("この発話は" + str(waiting_time) + "秒かかります")
 
             """if who_speak >= 0:
                 for i in range(self.PARTICIPANTS):
@@ -525,6 +599,7 @@ class DialogManager:
 
             line_to_send, next_speaker = self.generate_choice_sender(new_list)
             print("send" + line_to_send)
+            print("waitin: " + str(waiting_time))
 
             t = threading.Timer(waiting_time, self.send_choice, args=[line_to_send, next_speaker])
             t.start()
@@ -538,14 +613,14 @@ class DialogManager:
             keys = dic.keys()
             for key in keys:
                 line = line.replace(key, dic[key])
-        opinions = self.Opinions[self.p_on_focus]
+        opinions = self.Opinions[self.p_on_focus - 1]
         dic = opinions[1]
         keys = dic.keys()
         for key in keys:
             line = line.replace(key, dic[key])
 
 
-        claims = self.MainClaims[self.p_on_focus]
+        claims = self.MainClaims[self.p_on_focus - 1]
         keys = claims.keys()
         for key in keys:
             line = line.replace(key, claims[key])
@@ -554,15 +629,23 @@ class DialogManager:
 
     def send_choice(self, line_to_send, next_speaker):
         line_to_send = self.fix_transcript(line_to_send)
+        # wildcard = True
         wildcard = False
         if next_speaker == "X":
             wildcard = True
         for c in self.clients:
             if wildcard:
                 print("get wild " + line_to_send + "|||" + line_to_send.replace("X", c[2]))
-                c[0].sendto(self.fix_transcript(line_to_send.replace("X", c[2])).encode('utf-8'), c[1])
+                try:
+                    c[0].sendto(self.fix_transcript(line_to_send.replace("X", c[2])).encode('utf-8'), c[1])
+                except BrokenPipeError:
+                    print("broken pipe on sending")
             elif c[2] == next_speaker:
-                c[0].sendto(line_to_send.encode('utf-8'), c[1])
+                print("actually sent")
+                try:
+                    c[0].sendto(line_to_send.encode('utf-8'), c[1])
+                except BrokenPipeError:
+                    print("broken pipe on sending")
 
 
     def worker_thread(self, none):
@@ -581,6 +664,16 @@ class DialogManager:
                 self.ID = raw_mes.split(":")[-1].split(",")[0]
                 NAME = raw_mes.split(":")[-1].split(",")[-1]
                 print(self.ID, NAME)
+
+                delcand = -1
+                i = 0
+                for c in self.clients:
+                    if c[2] == self.ID:
+                        delcand = i
+                    i += 1
+                if delcand != -1:
+                    del self.clients[delcand]
+
 
             self.clients.append((clientsocket, (client_address, client_port), self.ID))
 
