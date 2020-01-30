@@ -15,8 +15,8 @@ class DialogManager:
         self.TOPIC_ID = TOPIC_ID
         self.DEFAULT_PACE = 6
 
-        topics = ["S", "P", "D", "F", "G", "H", "I", "J"]
-        self.chosen_topics = random.sample(topics, 4)
+        #topics = ["S", "P", "D", "F", "G", "H", "I", "J"]
+        self.chosen_topics = random.choice([["S", "S", "P", "P"], ["D", "D", "F", "F"]])
         self.path_chosen_topics = '../tempdata/chosen_topics.txt'
         topicsend = ""
         for tp in self.chosen_topics:

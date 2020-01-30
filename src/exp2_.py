@@ -98,23 +98,19 @@ class DialogManager:
         partcipants = [chr(i) for i in range(65, 65 + self.PARTICIPANTS)]
         srcA = read_utterance("../transcripts/PRESET/Intro.csv")
         self.dialogue_transcript.append(srcA)
-        srcA = read_utterance("../transcripts/PRESET/Branch.csv")
-        self.dialogue_transcript.append(srcA)
-        """for p in partcipants:
+        for p in partcipants:
             srcA = read_utterance("../transcripts/PRESET/Branch" + p + ".csv")
-            self.dialogue_transcript.append(srcA)"""
+            self.dialogue_transcript.append(srcA)
         self.contol_code = read_utterance("../transcripts/PRESET/ControlCode.csv")
 
     def variables_prepare(self):
-        self.next_speaker_on_ningenSpeech = "A"
-        self.isWaitingNingenSpeech = False
         self.next_speech_holder = "0000"
         self.InDiscussion = False
         self.kakasi = kakasi()
         self.kakasi.setMode("J", "H")
         self.converter = self.kakasi.getConverter()
 
-        self.toBegin = 99  # 全員が始めるボタンを押すまで待つ
+        self.toBegin = 0  # 全員が始めるボタンを押すまで待つ
         self.p_on_focus = -1  # 誰がメインの話者か(1=A)
 
         self.opn_relation = []  # それぞれの意見に対するそれぞれの反応
@@ -248,9 +244,6 @@ class DialogManager:
                 try:
                     for c in self.clients:
                         c[0].sendto("<Middle>:".encode('utf-8'), c[1])
-                    for c in self.clients:
-                        holding = ("<Choice>:0002," + self.ID + ",&「<ArgumentA>」か、「<ArgumentC>」か、#なるべく全員で結論を出してください。##残り時間は半分です,<YourNameX>さん,").replace("X", c[2])
-                        c[0].sendto(self.fix_transcript(holding).encode('utf-8'), c[1])
                 except BrokenPipeError:
                     print("broken pipe")
                     pass
@@ -575,7 +568,7 @@ class DialogManager:
 
                 time.sleep(waiting_time)
                 for c in self.clients:
-                    holding = ("<Choice>:0002," + self.ID + ",&「<ArgumentA>」か、「<ArgumentC>」か、#なるべく全員で結論を出してください。,<YourNameX>さん,").replace("X", c[2])
+                    holding = ("<Choice>:0002," + self.ID + ",&「<Argument>」という意見についてどう思いますか？#なるべく全員で結論を出してください。,<YourNameX>さん,").replace("X", c[2])
                     c[0].sendto(self.fix_transcript(holding).encode('utf-8'), c[1])
 
                 return
@@ -621,63 +614,39 @@ class DialogManager:
             keys = dic.keys()
             for key in keys:
                 line = line.replace(key, dic[key])
+        opinions = self.Opinions[self.p_on_focus - 1]
+        dic = opinions[1]
+        keys = dic.keys()
+        for key in keys:
+            line = line.replace(key, dic[key])
 
-        users = ["A", "B", "C", "D"]
-        for i in range(len(users)):
-            opinions = self.Opinions[i]
-            dic = opinions[1]
-            keys = dic.keys()
-            for key in keys:
-                line = line.replace(key[:-1] + users[i] + ">", dic[key])
 
-        for i in range(len(users)):
-            claims = self.MainClaims[i]
-            keys = claims.keys()
-            for key in keys:
-                line = line.replace(key[:-1] + users[i] + ">", claims[key])
-            print(line)
+        claims = self.MainClaims[self.p_on_focus - 1]
+        keys = claims.keys()
+        for key in keys:
+            line = line.replace(key, claims[key])
+        print(line)
         return  line
 
     def send_choice(self, line_to_send, next_speaker):
         line_to_send = self.fix_transcript(line_to_send)
-        command = "<Command>:" + str(next_speaker) + "," + line_to_send.split(":")[-1].split(",")[0] + "," + line_to_send.split(":")[-1].split(",")[3] + "," + line_to_send.split(":")[-1].split(",")[4]
-        print("call again" + command)
-        # self.choice_generation(command)
-
-        if line_to_send.split(":")[-1].split(",")[2][0] != '@':
-            for c in self.clients:
-                print("actually sent")
-                c[0].sendto(line_to_send.encode('utf-8'), c[1])
-
-            self.choice_generation(command)
-        else:
-            self.isWaitingNingenSpeech = True
-            self.next_speaker_on_ningenSpeech = next_speaker
-            wildcard = True
-            # wildcard = False
-            if next_speaker == "X":
-                wildcard = True
-            for c in self.clients:
-                if wildcard:
-                    print("get wild " + line_to_send + "|||" + line_to_send.replace("X", c[2]))
-                    c[0].sendto(self.fix_transcript(line_to_send.replace("X", c[2])).encode('utf-8'), c[1])
-                elif c[2] == next_speaker:
-                    print("actually sent")
-                    c[0].sendto(line_to_send.encode('utf-8'), c[1])
-
-
-
-        """wildcard = True
-        # wildcard = False
+        # wildcard = True
+        wildcard = False
         if next_speaker == "X":
             wildcard = True
         for c in self.clients:
             if wildcard:
                 print("get wild " + line_to_send + "|||" + line_to_send.replace("X", c[2]))
-                c[0].sendto(self.fix_transcript(line_to_send.replace("X", c[2])).encode('utf-8'), c[1])
+                try:
+                    c[0].sendto(self.fix_transcript(line_to_send.replace("X", c[2])).encode('utf-8'), c[1])
+                except BrokenPipeError:
+                    print("broken pipe on sending")
             elif c[2] == next_speaker:
                 print("actually sent")
-                c[0].sendto(line_to_send.encode('utf-8'), c[1])"""
+                try:
+                    c[0].sendto(line_to_send.encode('utf-8'), c[1])
+                except BrokenPipeError:
+                    print("broken pipe on sending")
 
 
     def worker_thread(self, none):
@@ -723,13 +692,8 @@ class DialogManager:
                     if raw_mes != "":
                         print("recv:" + raw_mes)
                         # sender = self.sender_detection(client_address, client_port)
-                        if "0000" in raw_mes:
-                            self.choice_generation(raw_mes)
-                        if self.isWaitingNingenSpeech:
-                            self.isWaitingNingenSpeech = False
-                            raw_mes = raw_mes.replace(":A,", ":" + self.next_speaker_on_ningenSpeech + ",")
 
-                            self.choice_generation(raw_mes)
+                        self.choice_generation(raw_mes)
 
                 except OSError:
                     break
